@@ -105,7 +105,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: azure/setup-kubectl@v4
       - run: kubectl kustomize deploy/kubernetes > /tmp/governforge.yaml
-      - run: kubectl apply --dry-run=client --validate=false -f /tmp/governforge.yaml
+      # kubectl client dry-run still performs API discovery and therefore fails on
+      # an intentionally clusterless CI runner. Kubeconform validates offline schemas.
+      - run: docker run --rm -v /tmp:/work ghcr.io/yannh/kubeconform@sha256:85dbef6b4b312b99133decc9c6fc9495e9fc5f92293d4ff3b7e1b30f5611823c -strict -summary -ignore-missing-schemas /work/governforge.yaml
 
   publish-snapshot:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
