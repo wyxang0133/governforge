@@ -14,7 +14,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.460.0",
     "next": "^15.0.0",
-    "postcss": "^8.5.19",
+    "postcss": "^8.5.20",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.6.0"
