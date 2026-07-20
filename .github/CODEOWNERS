@@ -1,0 +1,12 @@
+# Default owner
+* @wyxang0133
+
+# High-risk control-plane surfaces require explicit owner review.
+/governforge/migrations/ @wyxang0133
+/governforge/src/governforge/core/auth.py @wyxang0133
+/governforge/src/governforge/core/security_middleware.py @wyxang0133
+/governforge/src/governforge/core/policy_gate.py @wyxang0133
+/.github/ @wyxang0133
+/deploy/ @wyxang0133
+/Dockerfile* @wyxang0133
+/docker-compose*.yml @wyxang0133

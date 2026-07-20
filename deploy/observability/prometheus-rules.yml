@@ -1,32 +1,32 @@
 groups:
-  - name: devpilot-slo
+  - name: governforge-slo
     rules:
-      - record: devpilot:http_error_ratio_5m
-        expr: sum(rate(devpilot_http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(devpilot_http_requests_total[5m])), 0.001)
-      - record: devpilot:http_p95_seconds_5m
-        expr: histogram_quantile(0.95, sum by (le) (rate(devpilot_http_request_duration_seconds_bucket[5m])))
-      - alert: DevPilotHighErrorRate
-        expr: devpilot:http_error_ratio_5m > 0.02
+      - record: governforge:http_error_ratio_5m
+        expr: sum(rate(governforge_http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(governforge_http_requests_total[5m])), 0.001)
+      - record: governforge:http_p95_seconds_5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(governforge_http_request_duration_seconds_bucket[5m])))
+      - alert: GovernForgeHighErrorRate
+        expr: governforge:http_error_ratio_5m > 0.02
         for: 10m
-        labels: {severity: critical, service: devpilot}
-        annotations: {summary: "DevPilot 5xx error ratio is above 2%", runbook: "docs/04-部署与运维.md#告警处置"}
-      - alert: DevPilotHighLatency
-        expr: devpilot:http_p95_seconds_5m > 1
+        labels: {severity: critical, service: governforge}
+        annotations: {summary: "GovernForge 5xx error ratio is above 2%", runbook: "docs/04-部署与运维.md#告警处置"}
+      - alert: GovernForgeHighLatency
+        expr: governforge:http_p95_seconds_5m > 1
         for: 15m
-        labels: {severity: warning, service: devpilot}
-        annotations: {summary: "DevPilot API p95 latency is above 1 second"}
-      - alert: DevPilotWebhookFailures
-        expr: sum(increase(devpilot_webhook_events_total{status!~"processed|duplicate"}[10m])) > 5
+        labels: {severity: warning, service: governforge}
+        annotations: {summary: "GovernForge API p95 latency is above 1 second"}
+      - alert: GovernForgeWebhookFailures
+        expr: sum(increase(governforge_webhook_events_total{status!~"processed|duplicate"}[10m])) > 5
         for: 5m
-        labels: {severity: warning, service: devpilot}
+        labels: {severity: warning, service: governforge}
         annotations: {summary: "GitHub webhook failures are accumulating"}
-      - alert: DevPilotOutboxWorkerStalled
-        expr: time() - devpilot_outbox_last_success_unixtime > 120
+      - alert: GovernForgeOutboxWorkerStalled
+        expr: time() - governforge_outbox_last_success_unixtime > 120
         for: 5m
-        labels: {severity: critical, service: devpilot-worker}
+        labels: {severity: critical, service: governforge-worker}
         annotations: {summary: "Outbox worker has not completed a batch for two minutes"}
-      - alert: DevPilotOutboxDeadLetters
-        expr: increase(devpilot_outbox_events_total{status="failed"}[15m]) > 0
+      - alert: GovernForgeOutboxDeadLetters
+        expr: increase(governforge_outbox_events_total{status="failed"}[15m]) > 0
         for: 1m
-        labels: {severity: critical, service: devpilot-worker}
+        labels: {severity: critical, service: governforge-worker}
         annotations: {summary: "Outbox event reached dead-letter state", runbook: "docs/04-部署与运维.md#告警处置"}

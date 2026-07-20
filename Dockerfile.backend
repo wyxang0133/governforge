@@ -5,8 +5,8 @@ RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 
-COPY devpilot/pyproject.toml devpilot/uv.lock ./
-COPY devpilot/src/ ./src/
+COPY governforge/pyproject.toml governforge/uv.lock ./
+COPY governforge/src/ ./src/
 
 RUN uv sync --frozen
 
@@ -22,16 +22,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
-RUN groupadd --gid 10001 devpilot && \
-    useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin devpilot
+RUN groupadd --gid 10001 governforge && \
+    useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin governforge
 
 # Copy source code
-COPY devpilot/src/ /app/src/
-COPY devpilot/alembic.ini /app/alembic.ini
-COPY devpilot/migrations /app/migrations
+COPY governforge/src/ /app/src/
+COPY governforge/alembic.ini /app/alembic.ini
+COPY governforge/migrations /app/migrations
 
 EXPOSE 8000
 
 USER 10001:10001
 
-CMD ["sh", "-c", "alembic -c /app/alembic.ini upgrade head && uvicorn devpilot.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic -c /app/alembic.ini upgrade head && uvicorn governforge.main:app --host 0.0.0.0 --port 8000"]

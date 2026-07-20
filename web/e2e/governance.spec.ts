@@ -2,26 +2,39 @@ import { expect, test } from "@playwright/test";
 import { createHmac } from "node:crypto";
 
 test("enterprise governance flow works through the browser and BFF", async ({page}) => {
-  const username = `e2e-${Date.now()}`;
+  const runId = Date.now();
+  const username = `e2e-${runId}`;
+  const workspace = `e2e-${runId}`;
   const existingAdmin = process.env.E2E_ADMIN_USERNAME;
-  await page.goto(existingAdmin ? "/login" : "/register");
-  await page.getByLabel("用户名").fill(existingAdmin || username);
-  await page.getByLabel("密码").fill(process.env.E2E_ADMIN_PASSWORD || "E2ePass!2026");
-  await page.getByRole("button", {name: existingAdmin ? "登录" : "创建并进入"}).click();
-  await expect(page).toHaveURL(/\/$/);
+  if (existingAdmin) {
+    await page.goto("/login");
+    await page.getByLabel("用户名").fill(existingAdmin);
+    await page.getByLabel("密码").fill(process.env.E2E_ADMIN_PASSWORD || "E2ePass!2026");
+    await page.getByRole("button", {name: "登录"}).click();
+    await expect(page).toHaveURL(/\/$/);
+  } else {
+    // Every run owns an isolated workspace, so a persistent developer database cannot
+    // silently turn the new user into a low-privilege member and make the test flaky.
+    const registration = await page.request.post("/api/auth/register", {data: {username, password: "E2ePass!2026", tenant_id: workspace}});
+    expect(registration.ok()).toBeTruthy();
+    await page.goto("/");
+  }
 
   const payload = {number: 88, repository: {id: 8800, full_name: "acme/e2e", default_branch: "main"}, pull_request: {number: 88, title: "Enterprise delivery gate", state: "open", user: {login: "e2e"}, head: {sha: "e2esha"}, additions: 12, deletions: 2, changed_files: 1, labels: [{name: "ai-assisted"}]}};
   const raw = JSON.stringify(payload); const secret = process.env.E2E_GITHUB_WEBHOOK_SECRET || "";
-  const headers: Record<string,string> = {"Content-Type": "application/json", "X-GitHub-Event": "pull_request", "X-GitHub-Delivery": `e2e-${Date.now()}`};
+  const headers: Record<string,string> = {"Content-Type": "application/json", "X-GitHub-Event": "pull_request", "X-GitHub-Delivery": `e2e-${runId}`, "X-Workspace-ID": existingAdmin ? "ai_platform" : workspace};
   if (secret) headers["X-Hub-Signature-256"] = `sha256=${createHmac("sha256", secret).update(raw).digest("hex")}`;
   const webhook = await page.request.post("/api/integrations/github/webhook", {headers, data: raw});
   expect(webhook.ok()).toBeTruthy();
 
   await page.goto("/repositories");
+  // Synthetic webhooks are intentionally not presented as GitHub-App-managed assets.
+  // The default view stays production-safe; E2E explicitly opens the complete evidence catalog.
+  await page.getByRole("button", {name: "全部资产"}).click();
   await expect(page.getByText("acme/e2e")).toBeVisible();
   await page.goto("/pull-requests");
   await expect(page.getByText("Enterprise delivery gate")).toBeVisible();
-  await page.getByRole("link", {name: "#88"}).click();
+  await page.getByRole("link", {name: "Enterprise delivery gate"}).click();
   await expect(page.getByText("Enterprise delivery gate")).toBeVisible();
 
   await page.goto("/policies");

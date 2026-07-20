@@ -27,7 +27,7 @@ https://<your-domain>/integrations
 GITHUB_APP_ID=<app id>
 GITHUB_APP_SLUG=<app slug>
 GITHUB_APP_PRIVATE_KEY=<PEM private key>
-GITHUB_APP_PRIVATE_KEY_PATH=/run/secrets/devpilot/github-app.pem
+GITHUB_APP_PRIVATE_KEY_PATH=/run/secrets/governforge/github-app.pem
 GITHUB_WEBHOOK_SECRET=<strong webhook secret>
 GITHUB_CHECKS_ENABLED=true
 ```

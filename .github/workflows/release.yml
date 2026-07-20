@@ -26,11 +26,11 @@ jobs:
           context: .
           file: "${{ matrix.dockerfile }}"
           push: true
-          tags: "ghcr.io/${{ github.repository_owner }}/devpilot-${{ matrix.name }}:${{ github.ref_name }}"
+          tags: "ghcr.io/${{ github.repository_owner }}/governforge-${{ matrix.name }}:${{ github.ref_name }}"
           sbom: true
           provenance: mode=max
       - name: Keyless sign immutable image digest
         env:
-          IMAGE: "ghcr.io/${{ github.repository_owner }}/devpilot-${{ matrix.name }}"
+          IMAGE: "ghcr.io/${{ github.repository_owner }}/governforge-${{ matrix.name }}"
           DIGEST: "${{ steps.build.outputs.digest }}"
         run: cosign sign --yes "${IMAGE}@${DIGEST}"

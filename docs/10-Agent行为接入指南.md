@@ -1,45 +1,55 @@
-# Agent 行为接入指南
+# Coding Agent 原生接入指南
 
-## 标准事件模型
+## 稳定合同
 
-一次编码任务映射为一个 `AgentRun`，每个行为按递增 `sequence` 上报为 `AgentAction`：
+连接器统一上报 `schema_version=v1` 事件：`run.started`、`run.heartbeat`、`action.pre`、`action.completed`、`run.completed`。事件必须携带 `event_id`、`run_external_id`、provider、时间、Trace 和幂等序号。
 
-- `plan`：计划与任务拆解。
-- `file_read/file_write/file_delete`：文件操作。
-- `command`：终端命令。
-- `tool_call`：MCP、浏览器或外部系统工具。
-- `dependency`：依赖变更和漏洞结果。
-- `test`：测试名称、结论和覆盖率。
-- `pull_request`：PR 创建或更新。
+- 同一 Run ID 或 Action sequence 重放相同负载：返回 `duplicate`。
+- 同一幂等键上报不同负载：返回 `409 EVIDENCE_CONFLICT`。
+- 高风险 `action.pre`：创建中心审批，Hook 暂停轮询，超时 fail-closed。
+- Run 超过心跳窗口：Worker 标记 `timed_out`，不伪造完成。
 
-服务端对敏感文件、凭据、破坏性命令、权限扩大、未批准工具、依赖和测试行为分类。高风险 Action 返回 `waiting_approval`，调用方必须暂停 Agent，直到审批结果变为 approved/rejected。
+## 1. 签发服务凭据
 
-## 通用 Hook CLI
+在“连接器 → Coding Agent 服务身份”点击签发。Token 只显示一次，服务端只保存 SHA-256 摘要。
 
 ```powershell
-$env:DEVPILOT_URL="http://localhost:8000"
-$env:DEVPILOT_TOKEN="<access-token>"
-$env:DEVPILOT_WORKSPACE="ai_platform"
-
-devpilot-agent-hook start --external-id codex-20260719-001 --provider codex --agent-name Codex --task "升级登录会话" --plan "分析认证模块" --plan "修改并测试"
-
-devpilot-agent-hook action --run-id <run-id> --sequence 1 --type file_write --target "src/auth/session.py"
-devpilot-agent-hook action --run-id <run-id> --sequence 2 --type test --target "tests/test_auth.py" --detail '{"conclusion":"passed"}'
-devpilot-agent-hook complete --run-id <run-id>
+$env:GOVERNFORGE_URL="http://localhost:8000"
+$env:GOVERNFORGE_AGENT_TOKEN="<gf_agent_...>"
+$env:GOVERNFORGE_WORKSPACE="ai_platform"
+$env:GOVERNFORGE_ACTOR="developer@example.com"
 ```
 
-CLI 的 `--type` 使用下划线形式，例如 `file_write`。返回体包含 `requires_approval` 和 `approval_id`；高风险操作不能在未批准时继续执行。
+## 2. Codex 接入
 
-## 工具映射
+Codex 当前稳定 lifecycle hooks 包含 `SessionStart`、`PreToolUse`、`PermissionRequest`、`PostToolUse` 和 `Stop`；项目级 Hook 只会在项目被信任后加载。
 
-- Claude Code Hooks：在 PreToolUse/PostToolUse 中调用 action；`waiting_approval` 时退出非零并等待审批。
-- Codex/自研 Agent：在工具执行器外包一层 Hook，在执行文件/命令前上报。
-- Cursor/IDE Agent：通过扩展或 CI 汇总事件；无法做前置拦截时标记为检测模式。
+```powershell
+cd D:\path\to\target-repository
+governforge-agent-hook install --provider codex --root .
+```
 
-不同工具的原始事件先在连接器侧转换成标准 Action，策略和评估内核不绑定供应商。
+命令生成 `.codex/hooks.json`，不会覆盖已有文件。启动 Codex 后使用 `/hooks` 检查、信任新 Hook。对企业强制策略，应通过托管 `requirements.toml`/MDM 发布，不仅依赖仓库内配置。
 
-## 风险分类
+## 3. Claude Code 接入
 
-`secret_exposure`、`privilege_escalation`、`dependency_risk`、`test_bypass`、`sensitive_file_change`、`cost_anomaly`、`unapproved_tool`、`destructive_operation`、`data_exfiltration`、`policy_bypass`。
+```powershell
+cd D:\path\to\target-repository
+governforge-agent-hook install --provider claude-code --root .
+```
 
-生产接入必须使用短期服务身份或企业 OIDC Token，禁止把个人长期 Token 写进仓库。
+命令生成 `.claude/settings.json`，映射 `SessionStart`、`PreToolUse`、`PostToolUse` 和 `Stop`。中心审批超时默认 300 秒，可用 `GOVERNFORGE_APPROVAL_WAIT_SECONDS` 调整。
+
+## 4. 降级策略
+
+- 写文件、命令、未登记工具和敏感操作：GovernForge 不可用时默认 deny。
+- 只读操作：仅当显式设置 `GOVERNFORGE_FAIL_OPEN_READS=true` 才可 fail-open，并在 Hook 输出中标记降级。
+- 不得将个人 Web 登录 JWT 写入 Hook；机器凭据应设置到期时间并定期轮换。
+
+## 5. 验收用例
+
+1. 读取普通源文件：`allow`，形成 Action 审计。
+2. 修改 `auth`/迁移/部署文件：进入 Owner/Security 审批，未批准不执行。
+3. 执行删除、`git reset --hard` 或越权命令：critical，拒绝或等待 Security。
+4. 执行测试并停止任务：自动生成 Agent Evaluation。
+5. 中断 Hook 网络：写操作 fail-closed；恢复后相同事件幂等重放。

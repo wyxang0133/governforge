@@ -1,6 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: devpilot
+namespace: governforge
 resources:
   - namespace.yaml
   - workloads.yaml
@@ -8,7 +8,7 @@ resources:
   - network-policy.yaml
   - backup.yaml
 images:
-  - name: ghcr.io/example/devpilot-backend
+  - name: ghcr.io/example/governforge-backend
     newTag: replace-with-immutable-digest
-  - name: ghcr.io/example/devpilot-frontend
+  - name: ghcr.io/example/governforge-frontend
     newTag: replace-with-immutable-digest

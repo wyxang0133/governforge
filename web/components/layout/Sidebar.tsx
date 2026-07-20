@@ -64,7 +64,7 @@ export function Sidebar() {
         <div className="flex items-center gap-3">
           <div className="brand-mark">DP</div>
           <div>
-            <div className="text-[17px] font-semibold tracking-tight text-white">DevPilot</div>
+            <div className="text-[17px] font-semibold tracking-tight text-white">GovernForge</div>
             <div className="mt-0.5 text-[11px] font-medium tracking-wide text-slate-500">AI CONTROL PLANE</div>
           </div>
         </div>

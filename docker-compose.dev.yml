@@ -1,8 +1,8 @@
 services:
   backend:
     volumes:
-      - ./devpilot/src:/app/src:ro
-    command: uvicorn devpilot.main:app --app-dir /app/src --host 0.0.0.0 --port 8000 --reload
+      - ./governforge/src:/app/src:ro
+    command: uvicorn governforge.main:app --app-dir /app/src --host 0.0.0.0 --port 8000 --reload
   frontend:
     volumes:
       - ./web:/app

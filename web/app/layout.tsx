@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DevPilot · AI Governance Platform",
+  title: "GovernForge · AI Governance Platform",
   description: "企业 AI Coding 治理、知识助手与交付门禁平台",
 };
 

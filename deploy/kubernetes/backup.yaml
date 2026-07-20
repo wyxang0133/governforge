@@ -22,8 +22,8 @@ spec:
           containers:
             - name: pg-dump
               image: postgres:16-alpine
-              command: [sh, -ec, 'umask 077; pg_dump "$DATABASE_URL" --format=custom --file="/backups/devpilot-$(date -u +%Y%m%dT%H%M%SZ).dump"; find /backups -type f -name "*.dump" -mtime +14 -delete']
-              env: [{name: DATABASE_URL, valueFrom: {secretKeyRef: {name: devpilot-secrets, key: DATABASE_URL}}}]
+              command: [sh, -ec, 'umask 077; pg_dump "$DATABASE_URL" --format=custom --file="/backups/governforge-$(date -u +%Y%m%dT%H%M%SZ).dump"; find /backups -type f -name "*.dump" -mtime +14 -delete']
+              env: [{name: DATABASE_URL, valueFrom: {secretKeyRef: {name: governforge-secrets, key: DATABASE_URL}}}]
               securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
               volumeMounts: [{name: backups, mountPath: /backups}, {name: tmp, mountPath: /tmp}]
           volumes: [{name: backups, persistentVolumeClaim: {claimName: postgres-backups}}, {name: tmp, emptyDir: {sizeLimit: 64Mi}}]

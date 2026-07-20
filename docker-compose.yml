@@ -1,7 +1,10 @@
+name: governforge
+
 services:
   postgres:
     image: postgres:16-alpine
     environment:
+      # Legacy database identifiers preserve the existing local volume during the product rename.
       POSTGRES_DB: devpilot
       POSTGRES_USER: devpilot
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
@@ -41,7 +44,7 @@ services:
       SCIM_BEARER_TOKEN: ${SCIM_BEARER_TOKEN:-}
       SCIM_DEFAULT_WORKSPACE: ${SCIM_DEFAULT_WORKSPACE:-ai_platform}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
-      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-devpilot-api}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-governforge-api}
       OTEL_SAMPLE_RATIO: ${OTEL_SAMPLE_RATIO:-0.1}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_JSON: ${LOG_JSON:-false}
@@ -53,7 +56,7 @@ services:
       KNOWLEDGE_OUTPUT_COST_PER_MILLION: ${KNOWLEDGE_OUTPUT_COST_PER_MILLION:-0}
     ports: ["127.0.0.1:8000:8000"]
     volumes:
-      - ./.secrets:/run/secrets/devpilot:ro
+      - ./.secrets:/run/secrets/governforge:ro
     depends_on:
       postgres: {condition: service_healthy}
     healthcheck:
@@ -81,7 +84,7 @@ services:
 
   worker:
     build: {context: ., dockerfile: Dockerfile.backend}
-    command: python -m devpilot.workers.outbox
+    command: python -m governforge.workers.outbox
     environment:
       DATABASE_URL: postgresql+psycopg://devpilot:${POSTGRES_PASSWORD}@postgres:5432/devpilot
       GITHUB_CHECKS_ENABLED: ${GITHUB_CHECKS_ENABLED:-false}
@@ -95,11 +98,11 @@ services:
       LOG_JSON: ${LOG_JSON:-false}
       WORKER_METRICS_PORT: ${WORKER_METRICS_PORT:-9100}
     volumes:
-      - ./.secrets:/run/secrets/devpilot:ro
+      - ./.secrets:/run/secrets/governforge:ro
     depends_on:
       backend: {condition: service_healthy}
     healthcheck:
-      test: ["CMD", "python", "-c", "from sqlalchemy import text; from devpilot.core.database import engine; c=engine.connect(); c.execute(text('SELECT 1')); c.close()"]
+      test: ["CMD", "python", "-c", "from sqlalchemy import text; from governforge.core.database import engine; c=engine.connect(); c.execute(text('SELECT 1')); c.close()"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -107,3 +110,5 @@ services:
 
 volumes:
   postgres_data:
+    # Keep the pre-rename volume so existing accounts, GitHub installations and audit evidence survive.
+    name: ai-app_postgres_data

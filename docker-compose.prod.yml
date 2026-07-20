@@ -18,7 +18,7 @@ services:
     cap_drop: [ALL]
   caddy:
     image: caddy:2-alpine
-    container_name: devpilot-caddy
+    container_name: governforge-caddy
     ports:
       - "80:80"
       - "443:443"

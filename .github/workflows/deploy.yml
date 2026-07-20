@@ -1,0 +1,70 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target GitHub Environment
+        required: true
+        type: choice
+        options: [staging, production]
+      image_ref:
+        description: Immutable commit SHA or signed tag
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'staging' }}
+    env:
+      TARGET_ENV: ${{ inputs.environment || 'staging' }}
+      IMAGE_REF: ${{ inputs.image_ref || github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v4
+      - uses: imranismail/setup-kustomize@v2
+      - name: Require target-cluster credential
+        env: {KUBE_CONFIG_B64: "${{ secrets.KUBE_CONFIG_B64 }}"}
+        run: |
+          test -n "$KUBE_CONFIG_B64" || { echo "KUBE_CONFIG_B64 is not configured for $TARGET_ENV"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/kube"
+          echo "$KUBE_CONFIG_B64" | base64 --decode > "$RUNNER_TEMP/kube/config"
+          chmod 600 "$RUNNER_TEMP/kube/config"
+          echo "KUBECONFIG=$RUNNER_TEMP/kube/config" >> "$GITHUB_ENV"
+      - name: Render immutable images
+        run: |
+          cd deploy/kubernetes
+          kustomize edit set image ghcr.io/example/governforge-backend=ghcr.io/${{ github.repository_owner }}/governforge-backend:$IMAGE_REF
+          kustomize edit set image ghcr.io/example/governforge-frontend=ghcr.io/${{ github.repository_owner }}/governforge-frontend:$IMAGE_REF
+          kubectl kustomize . > "$RUNNER_TEMP/governforge.yaml"
+      - name: Apply and verify
+        run: |
+          kubectl delete job governforge-migrate -n governforge --ignore-not-found
+          kubectl apply -f "$RUNNER_TEMP/governforge.yaml"
+          kubectl wait -n governforge --for=condition=complete job/governforge-migrate --timeout=180s
+          kubectl rollout status deployment/backend -n governforge --timeout=180s
+          kubectl rollout status deployment/frontend -n governforge --timeout=180s
+          kubectl rollout status deployment/worker -n governforge --timeout=180s
+      - name: Capture rollback evidence
+        if: always()
+        run: |
+          kubectl get deployment,pod,job -n governforge -o wide > "$RUNNER_TEMP/deploy-evidence.txt" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: "deploy-${{ env.TARGET_ENV }}-${{ env.IMAGE_REF }}", path: "${{ runner.temp }}/deploy-evidence.txt", retention-days: 30}

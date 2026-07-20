@@ -1,19 +1,19 @@
 apiVersion: batch/v1
 kind: Job
-metadata: {name: devpilot-migrate, annotations: {argocd.argoproj.io/sync-wave: "-1"}}
+metadata: {name: governforge-migrate, annotations: {argocd.argoproj.io/sync-wave: "-1"}}
 spec:
   backoffLimit: 2
   template:
     spec:
       restartPolicy: Never
-      serviceAccountName: devpilot
+      serviceAccountName: governforge
       automountServiceAccountToken: false
       securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: migrate
-          image: ghcr.io/example/devpilot-backend
+          image: ghcr.io/example/governforge-backend
           command: [alembic, -c, /app/alembic.ini, upgrade, head]
-          envFrom: [{configMapRef: {name: devpilot-config}}, {secretRef: {name: devpilot-secrets}}]
+          envFrom: [{configMapRef: {name: governforge-config}}, {secretRef: {name: governforge-secrets}}]
           securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
 ---
 apiVersion: apps/v1
@@ -21,19 +21,19 @@ kind: Deployment
 metadata: {name: backend}
 spec:
   replicas: 2
-  selector: {matchLabels: {app: devpilot, component: backend}}
+  selector: {matchLabels: {app: governforge, component: backend}}
   template:
-    metadata: {labels: {app: devpilot, component: backend}}
+    metadata: {labels: {app: governforge, component: backend}}
     spec:
-      serviceAccountName: devpilot
+      serviceAccountName: governforge
       automountServiceAccountToken: false
       securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: backend
-          image: ghcr.io/example/devpilot-backend
-          command: [uvicorn, devpilot.main:app, --host, 0.0.0.0, --port, "8000", --no-access-log]
+          image: ghcr.io/example/governforge-backend
+          command: [uvicorn, governforge.main:app, --host, 0.0.0.0, --port, "8000", --no-access-log]
           ports: [{name: http, containerPort: 8000}]
-          envFrom: [{configMapRef: {name: devpilot-config}}, {secretRef: {name: devpilot-secrets}}]
+          envFrom: [{configMapRef: {name: governforge-config}}, {secretRef: {name: governforge-secrets}}]
           resources: {requests: {cpu: 200m, memory: 256Mi}, limits: {cpu: "1", memory: 1Gi}}
           readinessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 5, periodSeconds: 10}
           livenessProbe: {httpGet: {path: /livez, port: http}, initialDelaySeconds: 10, periodSeconds: 20}
@@ -46,19 +46,19 @@ kind: Deployment
 metadata: {name: worker}
 spec:
   replicas: 2
-  selector: {matchLabels: {app: devpilot, component: worker}}
+  selector: {matchLabels: {app: governforge, component: worker}}
   template:
-    metadata: {labels: {app: devpilot, component: worker}}
+    metadata: {labels: {app: governforge, component: worker}}
     spec:
-      serviceAccountName: devpilot
+      serviceAccountName: governforge
       automountServiceAccountToken: false
       securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: worker
-          image: ghcr.io/example/devpilot-backend
-          command: [python, -m, devpilot.workers.outbox]
+          image: ghcr.io/example/governforge-backend
+          command: [python, -m, governforge.workers.outbox]
           ports: [{name: metrics, containerPort: 9100}]
-          envFrom: [{configMapRef: {name: devpilot-config}}, {secretRef: {name: devpilot-secrets}}]
+          envFrom: [{configMapRef: {name: governforge-config}}, {secretRef: {name: governforge-secrets}}]
           resources: {requests: {cpu: 100m, memory: 128Mi}, limits: {cpu: 500m, memory: 512Mi}}
           securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
           volumeMounts: [{name: tmp, mountPath: /tmp}]
@@ -69,16 +69,16 @@ kind: Deployment
 metadata: {name: frontend}
 spec:
   replicas: 2
-  selector: {matchLabels: {app: devpilot, component: frontend}}
+  selector: {matchLabels: {app: governforge, component: frontend}}
   template:
-    metadata: {labels: {app: devpilot, component: frontend}}
+    metadata: {labels: {app: governforge, component: frontend}}
     spec:
-      serviceAccountName: devpilot
+      serviceAccountName: governforge
       automountServiceAccountToken: false
       securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
       containers:
         - name: frontend
-          image: ghcr.io/example/devpilot-frontend
+          image: ghcr.io/example/governforge-frontend
           ports: [{name: http, containerPort: 3000}]
           env: [{name: BACKEND_URL, value: http://backend:8000}]
           resources: {requests: {cpu: 100m, memory: 128Mi}, limits: {cpu: 500m, memory: 512Mi}}
@@ -91,14 +91,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata: {name: backend}
-spec: {selector: {app: devpilot, component: backend}, ports: [{name: http, port: 8000, targetPort: http}]}
+spec: {selector: {app: governforge, component: backend}, ports: [{name: http, port: 8000, targetPort: http}]}
 ---
 apiVersion: v1
 kind: Service
 metadata: {name: frontend}
-spec: {selector: {app: devpilot, component: frontend}, ports: [{name: http, port: 3000, targetPort: http}]}
+spec: {selector: {app: governforge, component: frontend}, ports: [{name: http, port: 3000, targetPort: http}]}
 ---
 apiVersion: v1
 kind: Service
 metadata: {name: worker-metrics}
-spec: {selector: {app: devpilot, component: worker}, ports: [{name: metrics, port: 9100, targetPort: metrics}]}
+spec: {selector: {app: governforge, component: worker}, ports: [{name: metrics, port: 9100, targetPort: metrics}]}
