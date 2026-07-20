@@ -1,0 +1,34 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: devpilot
+  annotations: {nginx.ingress.kubernetes.io/proxy-body-size: 2m, nginx.ingress.kubernetes.io/ssl-redirect: "true"}
+spec:
+  ingressClassName: nginx
+  tls: [{hosts: [devpilot.example.com], secretName: devpilot-tls}]
+  rules:
+    - host: devpilot.example.com
+      http:
+        paths:
+          - {path: /api, pathType: Prefix, backend: {service: {name: backend, port: {name: http}}}}
+          - {path: /, pathType: Prefix, backend: {service: {name: frontend, port: {name: http}}}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: backend}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: backend}
+  minReplicas: 2
+  maxReplicas: 10
+  behavior: {scaleDown: {stabilizationWindowSeconds: 300}}
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 65}}}]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: backend}
+spec: {minAvailable: 1, selector: {matchLabels: {app: devpilot, component: backend}}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: frontend}
+spec: {minAvailable: 1, selector: {matchLabels: {app: devpilot, component: frontend}}}

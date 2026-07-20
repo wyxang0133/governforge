@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* === Design System: 语义化色彩 Token === */
+:root {
+  /* 品牌色 */
+  --color-brand-50: #eff6ff;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-900: #1e3a5f;
+
+  /* AI 交互状态 */
+  --color-ai-streaming: #6366f1;
+  --color-ai-streaming-bg: #eef2ff;
+  --color-ai-completed: #10b981;
+  --color-ai-error: #ef4444;
+  --color-ai-pending: #f59e0b;
+
+  /* Guardrails 安全状态 */
+  --color-guardrail-blocked: #dc2626;
+  --color-guardrail-warn: #f97316;
+  --color-guardrail-pass: #22c55e;
+
+  /* RAG 置信度梯度 */
+  --color-rag-high: #22c55e;
+  --color-rag-medium: #f59e0b;
+  --color-rag-low: #ef4444;
+  --color-rag-none: #9ca3af;
+
+  /* 字体 */
+  --font-sans: "Inter", "Noto Sans SC", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: #f4f6fa;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+
+.sidebar-shell {
+  background:
+    radial-gradient(circle at 15% 0%, rgba(37, 99, 235, .16), transparent 28%),
+    linear-gradient(180deg, #08101f 0%, #070d19 100%);
+  box-shadow: inset -1px 0 rgba(255,255,255,.04);
+}
+
+.brand-mark {
+  display: flex;
+  height: 34px;
+  width: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: white;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, .3);
+}
+
+.enterprise-panel {
+  border: 1px solid rgba(226, 232, 240, .9);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .98);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .03), 0 8px 24px rgba(15, 23, 42, .035);
+}
+
+button, a { transition: color .15s ease, background-color .15s ease, border-color .15s ease, box-shadow .15s ease; }
+
+/* 隐藏 Next.js 开发模式水印 */
+#__next [data-next-logo],
+#__next a[href="https://nextjs.org"],
+#__next svg[width="24"][height="24"],
+#__next div[style*="position: fixed"][style*="bottom"],
+#__next div[style*="position: fixed"][style*="left"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

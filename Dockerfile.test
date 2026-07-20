@@ -1,0 +1,9 @@
+FROM python:3.12-slim
+RUN pip install --no-cache-dir uv
+WORKDIR /workspace
+COPY devpilot/pyproject.toml devpilot/uv.lock ./
+COPY devpilot/src ./src
+RUN uv sync --frozen --extra dev
+COPY devpilot/tests ./tests
+ENV PATH="/workspace/.venv/bin:$PATH" PYTHONPATH=/workspace/src PYTHONDONTWRITEBYTECODE=1
+CMD ["pytest", "-q"]

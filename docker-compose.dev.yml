@@ -1,0 +1,13 @@
+services:
+  backend:
+    volumes:
+      - ./devpilot/src:/app/src:ro
+    command: uvicorn devpilot.main:app --app-dir /app/src --host 0.0.0.0 --port 8000 --reload
+  frontend:
+    volumes:
+      - ./web:/app
+      - frontend_node_modules:/app/node_modules
+    command: npm run dev
+
+volumes:
+  frontend_node_modules:

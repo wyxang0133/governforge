@@ -1,0 +1,109 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: devpilot
+      POSTGRES_USER: devpilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devpilot -d devpilot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: {context: ., dockerfile: Dockerfile.backend}
+    environment:
+      DATABASE_URL: postgresql+psycopg://devpilot:${POSTGRES_PASSWORD}@postgres:5432/devpilot
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY in .env}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      GITHUB_CHECKS_ENABLED: ${GITHUB_CHECKS_ENABLED:-false}
+      GITHUB_CHECKS_TOKEN: ${GITHUB_CHECKS_TOKEN:-}
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_SLUG: ${GITHUB_APP_SLUG:-}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-}
+      GITHUB_APP_PRIVATE_KEY_PATH: ${GITHUB_APP_PRIVATE_KEY_PATH:-}
+      GITHUB_API_URL: ${GITHUB_API_URL:-https://api.github.com}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      MONTHLY_BUDGET_USD: ${MONTHLY_BUDGET_USD:-0}
+      ALLOW_SELF_REGISTRATION: ${ALLOW_SELF_REGISTRATION:-true}
+      ALLOW_LOCAL_AUTH: ${ALLOW_LOCAL_AUTH:-true}
+      OIDC_ENABLED: ${OIDC_ENABLED:-false}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-http://localhost:3000/api/auth/oidc/callback}
+      OIDC_DEFAULT_WORKSPACE: ${OIDC_DEFAULT_WORKSPACE:-ai_platform}
+      SCIM_ENABLED: ${SCIM_ENABLED:-false}
+      SCIM_BEARER_TOKEN: ${SCIM_BEARER_TOKEN:-}
+      SCIM_DEFAULT_WORKSPACE: ${SCIM_DEFAULT_WORKSPACE:-ai_platform}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-devpilot-api}
+      OTEL_SAMPLE_RATIO: ${OTEL_SAMPLE_RATIO:-0.1}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_JSON: ${LOG_JSON:-false}
+      KNOWLEDGE_LLM_ENABLED: ${KNOWLEDGE_LLM_ENABLED:-false}
+      KNOWLEDGE_LLM_BASE_URL: ${KNOWLEDGE_LLM_BASE_URL:-https://api.openai.com/v1}
+      KNOWLEDGE_LLM_API_KEY: ${KNOWLEDGE_LLM_API_KEY:-}
+      KNOWLEDGE_LLM_MODEL: ${KNOWLEDGE_LLM_MODEL:-gpt-4.1-mini}
+      KNOWLEDGE_INPUT_COST_PER_MILLION: ${KNOWLEDGE_INPUT_COST_PER_MILLION:-0}
+      KNOWLEDGE_OUTPUT_COST_PER_MILLION: ${KNOWLEDGE_OUTPUT_COST_PER_MILLION:-0}
+    ports: ["127.0.0.1:8000:8000"]
+    volumes:
+      - ./.secrets:/run/secrets/devpilot:ro
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        BACKEND_URL: http://backend:8000
+    environment: {BACKEND_URL: http://backend:8000}
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: {backend: {condition: service_healthy}}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/login"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  worker:
+    build: {context: ., dockerfile: Dockerfile.backend}
+    command: python -m devpilot.workers.outbox
+    environment:
+      DATABASE_URL: postgresql+psycopg://devpilot:${POSTGRES_PASSWORD}@postgres:5432/devpilot
+      GITHUB_CHECKS_ENABLED: ${GITHUB_CHECKS_ENABLED:-false}
+      GITHUB_CHECKS_TOKEN: ${GITHUB_CHECKS_TOKEN:-}
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_SLUG: ${GITHUB_APP_SLUG:-}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-}
+      GITHUB_APP_PRIVATE_KEY_PATH: ${GITHUB_APP_PRIVATE_KEY_PATH:-}
+      GITHUB_API_URL: ${GITHUB_API_URL:-https://api.github.com}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_JSON: ${LOG_JSON:-false}
+      WORKER_METRICS_PORT: ${WORKER_METRICS_PORT:-9100}
+    volumes:
+      - ./.secrets:/run/secrets/devpilot:ro
+    depends_on:
+      backend: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "from sqlalchemy import text; from devpilot.core.database import engine; c=engine.connect(); c.execute(text('SELECT 1')); c.close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

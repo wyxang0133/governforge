@@ -1,0 +1,36 @@
+# ---------- builder ----------
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+ARG BACKEND_URL=http://backend:8000
+ENV BACKEND_URL=${BACKEND_URL}
+
+COPY web/package.json web/package-lock.json ./
+
+RUN npm ci --prefer-offline
+
+COPY web/ .
+
+RUN npm run build
+
+# ---------- runner ----------
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
+
+RUN addgroup -g 10001 -S devpilot && adduser -u 10001 -S devpilot -G devpilot
+
+COPY --from=builder --chown=10001:10001 /app/.next/standalone ./
+COPY --from=builder --chown=10001:10001 /app/.next/static ./.next/static
+
+EXPOSE 3000
+
+USER 10001:10001
+
+CMD ["node", "server.js"]

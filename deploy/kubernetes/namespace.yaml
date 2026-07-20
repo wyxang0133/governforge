@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Namespace
+metadata: {name: devpilot, labels: {pod-security.kubernetes.io/enforce: restricted}}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: devpilot, namespace: devpilot}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: devpilot-config, namespace: devpilot}
+data:
+  ENVIRONMENT: production
+  ALLOW_SELF_REGISTRATION: "false"
+  ALLOW_LOCAL_AUTH: "false"
+  LOG_JSON: "true"
+  LOG_LEVEL: INFO
+  OTEL_SERVICE_NAME: devpilot-api
+  OTEL_SAMPLE_RATIO: "0.1"
+  GITHUB_CHECKS_ENABLED: "true"
+  GITHUB_APP_SLUG: replace-with-github-app-slug
+  KNOWLEDGE_LLM_ENABLED: "false"
+  KNOWLEDGE_LLM_BASE_URL: https://api.openai.com/v1
+  KNOWLEDGE_LLM_MODEL: gpt-4.1-mini
+  KNOWLEDGE_INPUT_COST_PER_MILLION: "0"
+  KNOWLEDGE_OUTPUT_COST_PER_MILLION: "0"
+  KNOWLEDGE_MAX_UPLOAD_BYTES: "5242880"
