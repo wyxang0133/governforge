@@ -26,6 +26,21 @@ ENV PORT=3000
 
 RUN addgroup -g 10001 -S governforge && adduser -u 10001 -S governforge -G governforge
 
+# The standalone Next.js server only needs the Node runtime. The npm/corepack
+# toolchains are build-time utilities and bring unnecessary packages and CVEs
+# into the production image.
+RUN apk upgrade --no-cache && \
+    rm -rf /usr/local/lib/node_modules/npm \
+    /usr/local/lib/node_modules/corepack \
+    /opt/yarn-v1.22.22 \
+    /usr/local/bin/npm \
+    /usr/local/bin/npx \
+    /usr/local/bin/corepack \
+    /usr/local/bin/yarn \
+    /usr/local/bin/yarnpkg \
+    /usr/local/bin/pnpm \
+    /usr/local/bin/pnpx
+
 COPY --from=builder --chown=10001:10001 /app/.next/standalone ./
 COPY --from=builder --chown=10001:10001 /app/.next/static ./.next/static
 
