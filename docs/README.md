@@ -12,6 +12,7 @@
 | `10-Agent行为接入指南.md` | Codex/Claude Code 标准事件、安装与操作前门禁 |
 | `11-GitHub-App接入指南.md` | GitHub App 权限、安装、同步和真实验收 |
 | `../scripts/verify-github-governance.ps1` | 发布前自动回读仓库公开状态、main 保护和 required checks |
+| `13-交付前执行手册.md` | Codex 与项目 Owner 的责任边界、命令步骤和最终交付判定 |
 
 口径优先级：产品边界以 `01` 为准，实施范围以 `02` 为准，生产判定以 `03` 为准。被合并的旧审计/差距/清单文档仅存在于 Git 历史。
 
