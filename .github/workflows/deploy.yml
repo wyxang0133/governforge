@@ -36,8 +36,8 @@ jobs:
       TARGET_ENV: ${{ inputs.environment || 'staging' }}
       IMAGE_REF: ${{ inputs.image_ref || github.event.workflow_run.head_sha }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-kubectl@v4
+      - uses: actions/checkout@v7
+      - uses: azure/setup-kubectl@v5
       - uses: imranismail/setup-kustomize@v2
       - name: Require target-cluster credential
         env: {KUBE_CONFIG_B64: "${{ secrets.KUBE_CONFIG_B64 }}"}
@@ -75,6 +75,6 @@ jobs:
         if: always()
         run: |
           kubectl get deployment,pod,job -n governforge -o wide > "$RUNNER_TEMP/deploy-evidence.txt" || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with: {name: "deploy-${{ env.TARGET_ENV }}-${{ env.IMAGE_REF }}", path: "${{ runner.temp }}/deploy-evidence.txt", retention-days: 30}
