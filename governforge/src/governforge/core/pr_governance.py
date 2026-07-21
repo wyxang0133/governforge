@@ -43,6 +43,14 @@ def evaluate_pull_request_record(session: Session, workspace_id: str, pr: PullRe
         "estimated_cost_usd", "human_approved", "monthly_budget_exceeded", "budget_evidence",
     )}), cost_budget_usd=policy.cost_budget_usd, min_coverage=policy.min_test_coverage,
         min_source_confidence=policy.min_source_confidence, require_security_scan=policy.require_security_scan)
+    # Evidence completeness is a separate hard gate.  A policy must never allow a
+    # PR merely because synthetic/partial CI data happens to satisfy the scoring
+    # thresholds; the current SHA must have both changed-file evidence and a
+    # completed CI result before any allow decision is possible.
+    if not evidence["evidence_complete"]:
+        result.checks["evidence_completeness"] = "block"
+        result.reasons.append("当前 head SHA 的变更文件或 CI 证据不完整")
+        result.decision = "block"
     previous = session.scalar(select(PolicyEvaluationORM).where(
         PolicyEvaluationORM.pull_request_id == pr.id,
     ).order_by(desc(PolicyEvaluationORM.created_at)))

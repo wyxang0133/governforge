@@ -54,6 +54,7 @@ jobs:
           kustomize edit set image ghcr.io/example/governforge-frontend=ghcr.io/${{ github.repository_owner }}/governforge-frontend:$IMAGE_REF
           kubectl kustomize . > "$RUNNER_TEMP/governforge.yaml"
       - name: Apply and verify
+        id: apply_verify
         run: |
           kubectl delete job governforge-migrate -n governforge --ignore-not-found
           kubectl apply -f "$RUNNER_TEMP/governforge.yaml"
@@ -61,6 +62,15 @@ jobs:
           kubectl rollout status deployment/backend -n governforge --timeout=180s
           kubectl rollout status deployment/frontend -n governforge --timeout=180s
           kubectl rollout status deployment/worker -n governforge --timeout=180s
+      - name: Roll back workloads on failed rollout
+        if: failure()
+        run: |
+          set +e
+          for deployment in backend frontend worker; do
+            kubectl rollout undo deployment/$deployment -n governforge
+            kubectl rollout status deployment/$deployment -n governforge --timeout=180s
+          done
+          echo "Workload rollback attempted. Database migration rollback remains a reviewed/manual operation."
       - name: Capture rollback evidence
         if: always()
         run: |

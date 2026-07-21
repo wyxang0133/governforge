@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from governforge.core.agents import sweep_stale_runs
 from governforge.core.database import SessionFactory
-from governforge.models.governance import AgentRunORM, CostEventORM, IntegrationCredentialORM
+from governforge.models.governance import AgentRunORM, AIUsageEventORM, CostEventORM, IntegrationCredentialORM
 
 
 def _agent_credential(client, scopes=None):
@@ -88,3 +88,65 @@ def test_model_gateway_routes_usage_and_tco(client, monkeypatch):
     with SessionFactory() as session:
         assert session.scalar(select(CostEventORM).where(CostEventORM.trace_id == "trace-model-1")) is not None
         assert session.scalar(select(IntegrationCredentialORM).where(IntegrationCredentialORM.name == "test-machine")).token_hash != token
+
+
+def test_model_gateway_fails_over_to_next_priority_and_marks_degraded(client, monkeypatch):
+    token = _agent_credential(client, ["model:invoke"])
+    monkeypatch.setenv("MODEL_PROVIDER_PRIMARY_API_KEY", "primary-key")
+    monkeypatch.setenv("MODEL_PROVIDER_SECONDARY_API_KEY", "secondary-key")
+    payload = {"model_alias": "fallback-test", "upstream_model": "test-model", "timeout_seconds": 5,
+               "max_retries": 0, "input_cost_per_million": 1, "output_cost_per_million": 1}
+    for priority, provider, env_name in ((10, "primary", "MODEL_PROVIDER_PRIMARY_API_KEY"),
+                                         (20, "secondary", "MODEL_PROVIDER_SECONDARY_API_KEY")):
+        response = client.post("/api/model-gateway/routes", json=payload | {
+            "provider": provider, "priority": priority, "base_url": "https://models.example/v1",
+            "api_key_env": env_name,
+        })
+        assert response.status_code == 201
+
+    calls: list[str] = []
+
+    def fake_post(url, **kwargs):
+        calls.append(kwargs["headers"]["Authorization"])
+        if len(calls) == 1:
+            return httpx.Response(503, json={"error": "primary unavailable"}, request=httpx.Request("POST", url))
+        return httpx.Response(200, json={"id": "fallback", "choices": [],
+                                        "usage": {"prompt_tokens": 10, "completion_tokens": 5}},
+                             request=httpx.Request("POST", url))
+
+    monkeypatch.setattr("governforge.api.model_gateway.httpx.post", fake_post)
+    response = client.post("/api/model-gateway/v1/chat/completions",
+                           json={"model": "fallback-test", "messages": [{"role": "user", "content": "ping"}]},
+                           headers={"Authorization": f"Bearer {token}", "X-Workspace-ID": "ai_platform",
+                                    "X-Trace-ID": "trace-fallback-1"})
+    assert response.status_code == 200
+    assert response.json()["governance"]["provider"] == "secondary"
+    assert response.json()["governance"]["degraded"] is True
+    assert calls == ["Bearer primary-key", "Bearer secondary-key"]
+
+
+def test_model_gateway_hard_budget_blocks_before_upstream(client, monkeypatch):
+    token = _agent_credential(client, ["model:invoke"])
+    monkeypatch.setenv("MODEL_PROVIDER_BUDGET_API_KEY", "budget-key")
+    route = client.post("/api/model-gateway/routes", json={
+        "model_alias": "budget-test", "provider": "budget", "upstream_model": "test-model",
+        "base_url": "https://models.example/v1", "api_key_env": "MODEL_PROVIDER_BUDGET_API_KEY",
+        "priority": 10, "timeout_seconds": 5, "max_retries": 0,
+    })
+    assert route.status_code == 201
+    budget = client.put("/api/budgets", json={"scope_type": "workspace", "scope_id": "*",
+                                                "period": "2026-07", "limit_usd": 0.01,
+                                                "warning_ratio": 0.8, "hard_limit": True})
+    assert budget.status_code in (200, 201)
+    with SessionFactory() as session:
+        session.add(AIUsageEventORM(workspace_id="ai_platform", external_id="budget-spend-1",
+                                    provider="budget", model="test-model", input_tokens=1,
+                                    output_tokens=1, cost_usd=1, source="test"))
+        session.commit()
+    monkeypatch.setattr("governforge.api.model_gateway.httpx.post",
+                        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("upstream must not be called")))
+    response = client.post("/api/model-gateway/v1/chat/completions",
+                           json={"model": "budget-test", "messages": [{"role": "user", "content": "blocked"}]},
+                           headers={"Authorization": f"Bearer {token}", "X-Workspace-ID": "ai_platform"})
+    assert response.status_code == 402
+    assert response.json()["detail"] == "MODEL_BUDGET_EXCEEDED"
