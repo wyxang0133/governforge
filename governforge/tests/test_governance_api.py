@@ -174,3 +174,30 @@ def test_monthly_hard_budget_blocks_pull_request(client):
     client.post("/api/integrations/ci/evidence", json={"pull_request_id": pr_id, "external_id": "security-budget", "name": "security-sast", "conclusion": "success", "coverage": .9, "ai_provenance": True})
     decision = client.post(f"/api/governance/pull-requests/{pr_id}/evaluate").json()
     assert decision["decision"] == "block" and decision["checks"]["monthly_budget"] == "block"
+
+
+def test_auto_merge_is_opt_in_and_requires_complete_allow_evidence(client):
+    from governforge.core.database import SessionFactory
+    from governforge.models.governance import OutboxEventORM
+
+    client.post("/api/integrations/github/webhook", headers={"X-GitHub-Event": "pull_request", "X-GitHub-Delivery": "auto-merge-pr"}, json=_pr_payload())
+    repository = client.get("/api/governance/repositories").json()[0]
+    pr_id = client.get("/api/governance/pull-requests").json()[0]["id"]
+    disabled = client.patch(f"/api/governance/repositories/{repository['id']}/governance", json={"auto_merge_enabled": False, "merge_method": "squash"})
+    assert disabled.status_code == 200
+    client.post("/api/integrations/ci/evidence", json={"pull_request_id": pr_id, "external_id": "auto-files", "name": "tests", "conclusion": "success", "coverage": .9, "changed_files": ["src/payments.py"], "ai_provenance": True, "evidence_ref": "ci://auto-files"})
+    client.post("/api/integrations/ci/evidence", json={"pull_request_id": pr_id, "external_id": "auto-security", "name": "security-sast", "conclusion": "success", "coverage": .9, "changed_files": ["src/payments.py"], "ai_provenance": True, "evidence_ref": "ci://auto-security"})
+    with SessionFactory() as session:
+        session.add(OutboxEventORM(workspace_id="ai_platform", aggregate_type="noop", aggregate_id="noop", event_type="test.marker", payload={}))
+        session.commit()
+    decision = client.post(f"/api/governance/pull-requests/{pr_id}/evaluate").json()
+    assert decision["decision"] == "allow"
+    with SessionFactory() as session:
+        assert not session.query(OutboxEventORM).filter(OutboxEventORM.event_type == "github.merge.requested").count()
+    enabled = client.patch(f"/api/governance/repositories/{repository['id']}/governance", json={"auto_merge_enabled": True, "merge_method": "squash"})
+    assert enabled.status_code == 200
+    client.post("/api/integrations/ci/evidence", json={"pull_request_id": pr_id, "external_id": "auto-refresh", "name": "tests", "conclusion": "success", "coverage": .9, "changed_files": ["src/payments.py", "README.md"], "ai_provenance": True, "evidence_ref": "ci://auto-refresh"})
+    client.post(f"/api/governance/pull-requests/{pr_id}/evaluate")
+    with SessionFactory() as session:
+        merge = session.query(OutboxEventORM).filter(OutboxEventORM.event_type == "github.merge.requested").one()
+        assert merge.payload["head_sha"] == "abc123"
