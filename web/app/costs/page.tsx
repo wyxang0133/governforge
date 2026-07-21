@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Plus, Power, Route, WalletCards } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { BarList, EmptyState, MetricCard, Panel, PanelHeader, StatusBadge } from "@/components/ui/Console";
@@ -23,7 +23,7 @@ export default function Page(){
   async function createRoute(event:FormEvent){event.preventDefault();const result=await apiFetch("/api/model-gateway/routes",{method:"POST",body:JSON.stringify(form)});if(result.error){setError(result.error.message);return}setNotice("模型路由已创建；密钥仍由环境变量注入。可为同一别名添加更低优先级的降级路由。");setShowForm(false);await load()}
   async function disableRoute(id:string){if(!confirm("停用此模型路由？已有调用不受影响，新调用会转向下一优先级。"))return;const result=await apiFetch(`/api/model-gateway/routes/${id}`,{method:"DELETE"});if(result.error)setError(result.error.message);else await load()}
   const total=rows.reduce((sum,row)=>sum+row.cost_usd,0);const tokens=rows.reduce((sum,row)=>sum+row.input_tokens+row.output_tokens,0);
-  const models=useMemo(()=>{const map:Record<string,{label:string;value:number;cost:number}>={};for(const row of rows){const key=`${row.provider}/${row.model}`;map[key]??={label:key,value:0,cost:0};map[key].value++;map[key].cost+=row.cost_usd}return Object.values(map).sort((a,b)=>b.value-a.value)},[rows]);const budget=budgets[0];
+  const budget=budgets[0];
   return <AppLayout title="模型网关与成本" subtitle="统一模型别名、主备路由、硬预算和全口径 TCO；供应商密钥不进入数据库。">
     {error&&<div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}{notice&&<div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</div>}
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><MetricCard label="模型调用成本" value={`$${total.toFixed(4)}`} description={`${rows.length} 次可归因调用`}/><MetricCard label="全口径 TCO" value={`$${tco.total_usd.toFixed(2)}`} description="模型、人工、返工与事故"/><MetricCard label="本月预算使用" value={budget?`${(budget.spent_usd/budget.limit_usd*100).toFixed(1)}%`:"未配置"} description={budget?`$${budget.spent_usd.toFixed(2)} / $${budget.limit_usd.toFixed(2)}`:"建议设置硬预算"} tone={budget?.exceeded?"red":budget?.warning?"amber":"emerald"}/><MetricCard label="可用路由" value={routes.filter(r=>r.enabled&&r.secret_configured).length} description={`${new Set(routes.map(r=>r.model_alias)).size} 个模型别名`}/></div>
