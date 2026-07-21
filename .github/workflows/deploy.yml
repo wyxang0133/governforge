@@ -75,6 +75,6 @@ jobs:
         if: always()
         run: |
           kubectl get deployment,pod,job -n governforge -o wide > "$RUNNER_TEMP/deploy-evidence.txt" || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with: {name: "deploy-${{ env.TARGET_ENV }}-${{ env.IMAGE_REF }}", path: "${{ runner.temp }}/deploy-evidence.txt", retention-days: 30}
