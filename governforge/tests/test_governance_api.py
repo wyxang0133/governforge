@@ -45,9 +45,15 @@ def test_ci_webhooks_feed_automatic_policy_evaluation(client):
     pr_id = client.get("/api/governance/pull-requests").json()[0]["id"]
     base = {"repository": {"id": 1001, "full_name": "acme/payments"}}
     for delivery, name, coverage in (("ci-1", "tests", .85), ("ci-2", "security-sast", None)):
-        payload = {**base, "check_run": {"id": delivery, "head_sha": "abc123", "name": name, "status": "completed", "conclusion": "success", "coverage": coverage}}
+        payload = {**base, "check_run": {"id": delivery, "head_sha": "abc123", "name": name, "status": "completed", "conclusion": "success", "coverage": coverage, "changed_files": ["src/payments.py"]}}
         response = client.post("/api/integrations/github/webhook", headers={"X-GitHub-Event": "check_run", "X-GitHub-Delivery": delivery}, json=payload)
         assert response.status_code == 200
+    evidence = client.post("/api/integrations/ci/evidence", json={
+        "pull_request_id": pr_id, "external_id": "files-for-abc123", "name": "tests",
+        "conclusion": "success", "coverage": .85, "changed_files": ["src/payments.py"],
+        "ai_provenance": True, "evidence_ref": "ci://files/abc123",
+    })
+    assert evidence.status_code == 202
     decision = client.post(f"/api/governance/pull-requests/{pr_id}/evaluate").json()
     assert decision["decision"] == "allow"
     assert decision["checks"]["ci_status"] == "pass"
