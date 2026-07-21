@@ -103,7 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/setup-kubectl@v4
+      - uses: azure/setup-kubectl@v5
       - run: kubectl kustomize deploy/kubernetes > /tmp/governforge.yaml
       # kubectl client dry-run still performs API discovery and therefore fails on
       # an intentionally clusterless CI runner. Kubeconform validates offline schemas.

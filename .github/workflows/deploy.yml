@@ -37,7 +37,7 @@ jobs:
       IMAGE_REF: ${{ inputs.image_ref || github.event.workflow_run.head_sha }}
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/setup-kubectl@v4
+      - uses: azure/setup-kubectl@v5
       - uses: imranismail/setup-kustomize@v2
       - name: Require target-cluster credential
         env: {KUBE_CONFIG_B64: "${{ secrets.KUBE_CONFIG_B64 }}"}
